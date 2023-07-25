@@ -16,4 +16,4 @@ spec:
         - name: cart-microservice
           image: 2741/cart-microservice:latest
           ports:
-            - containerPort: 8082
+            - containerPort: 8080
