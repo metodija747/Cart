@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cart-microservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cart-microservice
+  template:
+    metadata:
+      labels:
+        app: cart-microservice
+    spec:
+      containers:
+        - name: cart-microservice
+          image: 2741/cart-microservice:latest
+          ports:
+            - containerPort: 8080

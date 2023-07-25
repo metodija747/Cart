@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cart-microservice
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+    - http:
+        paths:
+          - pathType: Prefix
+            path: "/cart"
+            backend:
+              service:
+                name: cart-microservice
+                port:
+                  number: 80
