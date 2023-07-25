@@ -44,6 +44,7 @@ public class CartResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Response getCart(@HeaderParam("Auth") String token,
                             @QueryParam("page") Integer page) {
+        LOGGER.info("DynamoDB response: " + productCatalogUrl);
         String userId;
         try {
             userId = TokenVerifier.verifyToken(token, issuer);
@@ -240,6 +241,7 @@ public class CartResource {
     @Path("/{productId}")
     public Response deleteFromCart(@HeaderParam("Auth") String token, @PathParam("productId") String productId) {
         String userId;
+        LOGGER.info("DynamoDB response: " + productCatalogUrl);
         try {
             userId = TokenVerifier.verifyToken(token, issuer);
         } catch (JWTVerificationException | JwkException | MalformedURLException e) {
