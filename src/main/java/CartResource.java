@@ -63,7 +63,12 @@ public class CartResource {
 
         try {
             QueryResponse queryResponse = dynamoDB.query(queryRequest);
-            Map<String, AttributeValue> userCart = queryResponse.items().get(0);
+            List<Map<String, AttributeValue>> itemsList = queryResponse.items();
+
+            if (itemsList.isEmpty()) {
+                return Response.status(Response.Status.NOT_FOUND).entity("No items found in cart.").build();
+            }
+            Map<String, AttributeValue> userCart = itemsList.get(0);
             List<Map<String, String>> items = ResponseTransformer.transformCartItems(Collections.singletonList(userCart));
             List<Map<String, String>> products = new Gson().fromJson(items.get(0).get("products"), new TypeToken<List<Map<String, String>>>() {
             }.getType());
