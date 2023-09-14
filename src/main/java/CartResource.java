@@ -1,14 +1,10 @@
 import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
 import javax.ws.rs.*;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import com.auth0.jwk.JwkException;
-import com.auth0.jwt.exceptions.JWTVerificationException;
+
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.kumuluz.ee.discovery.annotations.DiscoverService;
@@ -22,6 +18,15 @@ import org.eclipse.microprofile.jwt.ClaimValue;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.metrics.Histogram;
 import org.eclipse.microprofile.metrics.annotation.*;
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.enums.ParameterIn;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
 import org.eclipse.microprofile.opentracing.Traced;
 import org.eclipse.microprofile.rest.client.RestClientBuilder;
 import software.amazon.awssdk.regions.Region;
@@ -40,6 +45,7 @@ import java.util.logging.Logger;
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 @RequestScoped
+@SecurityRequirement(name = "jwtAuth")
 public class CartResource {
 
     @Inject
@@ -94,22 +100,49 @@ public class CartResource {
     Histogram getProductsHistogram;
 
     @GET
+    @Operation(
+            summary = "Fetch a user's cart",
+            description = "This operation fetches the cart for a user, based on the provided JWT token. It returns a paginated list of products in the cart, total pages, and the total price."
+    )
+    @APIResponses({
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Successfully fetched cart"
+            ),
+            @APIResponse(
+                    responseCode = "401",
+                    description = "Unauthorized, invalid token"
+            ),
+            @APIResponse(
+                    responseCode = "500",
+                    description = "Internal server error"
+            )
+    })
+    @Parameter(
+            name = "page",
+            description = "The page number for paginated results",
+            required = false,
+            in = ParameterIn.QUERY,
+            schema = @Schema(type = SchemaType.INTEGER)
+    )
     @Produces(MediaType.APPLICATION_JSON)
     @Counted(name = "getCartCount", description = "Count of getCart calls")
     @Timed(name = "getCartTime", description = "Time taken to fetch a cart")
     @Metered(name = "getCartMetered", description = "Rate of getCart calls")
     @ConcurrentGauge(name = "getCartConcurrent", description = "Concurrent getCart calls")
-    @Timeout(value = 20, unit = ChronoUnit.SECONDS) // Timeout after 20 seconds
+    @Timeout(value = 50, unit = ChronoUnit.SECONDS) // Timeout after 50 seconds
     @Retry(maxRetries = 3) // Retry up to 3 times
     @Fallback(fallbackMethod = "getCartFallback") // Fallback method if all retries fail
-    @CircuitBreaker(requestVolumeThreshold = 4) // Use circuit breaker after 4 failed requests
-    @Bulkhead(5) // Limit concurrent calls to 5
+    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 2000)
+    @Bulkhead(100) // Limit concurrent calls to 100
     @Traced
     public Response getCart(@QueryParam("page") Integer page) {
 
         if (jwt == null) {
-            LOGGER.info("Unauthorized: only authenticated users can view his/hers cart.");
-            return Response.ok("Unauthorized: only authenticated users can view his/hers cart.").build();
+            LOGGER.log(Level.SEVERE, "Token verification failed");
+            return Response.status(Response.Status.UNAUTHORIZED)
+                    .entity("Invalid token.")
+                    .build();
         }
         String userId = optSubject.getValue().orElse("default_value");
 
@@ -137,9 +170,16 @@ public class CartResource {
         try {
             QueryResponse queryResponse = dynamoDB.query(queryRequest);
             List<Map<String, AttributeValue>> itemsList = queryResponse.items();
-
-            if (itemsList.isEmpty()) {
-                return Response.status(Response.Status.NOT_FOUND).entity("No items found in cart.").build();
+            if (itemsList.isEmpty() || itemsList.get(0).get("OrderList").s().isEmpty()) {
+                // Create an empty cart response
+                Map<String, Object> emptyCartResponse = new HashMap<>();
+                emptyCartResponse.put("products", Collections.emptyList());
+                emptyCartResponse.put("totalPages", 0);
+                emptyCartResponse.put("totalPrice", 0);
+                LOGGER.info("User's cart is empty");
+                return Response.status(Response.Status.OK)
+                        .entity(emptyCartResponse)
+                        .build();
             }
             Map<String, AttributeValue> userCart = itemsList.get(0);
             List<Map<String, String>> items = ResponseTransformer.transformCartItems(Collections.singletonList(userCart));
@@ -158,41 +198,61 @@ public class CartResource {
             responseBody.put("products", pagedProducts);
             responseBody.put("totalPages", totalPages);
             responseBody.put("totalPrice", items.get(0).get("TotalPrice"));
+            LOGGER.info("Successfully obtained user's cart");
+            return Response.status(Response.Status.OK).entity(responseBody).build();
 
-//            span.setTag("completed", true);
-            return Response.ok(responseBody).build();
         } catch (DynamoDbException e) {
             LOGGER.log(Level.SEVERE, "Error while getting cart for user " + userId, e);
-//            span.setTag("error", true);
+            span.setTag("error", true);
             throw new WebApplicationException("Error while getting cart. Please try again later.", e, Response.Status.INTERNAL_SERVER_ERROR);
-        } finally {
-//            span.finish();
+        }finally {
+            span.finish();
         }
     }
     public Response getCartFallback(@QueryParam("page") Integer page) {
         LOGGER.info("Fallback activated: Unable to fetch cart at the moment for token: " + optSubject.getValue().orElse("default_value"));
         Map<String, String> response = new HashMap<>();
         response.put("description", "Unable to fetch cart at the moment. Please try again later.");
-        return Response.ok(response).build();
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(response).build();
     }
 
 
     @POST
+    @Operation(
+            summary = "Add a product to the user's cart",
+            description = "Adds a specified quantity of a product to the cart of the authenticated user."
+    )
+    @APIResponses(value = {
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Product successfully added to the cart"
+            ),
+            @APIResponse(
+                    responseCode = "401",
+                    description = "Unauthorized, invalid token"
+            ),
+            @APIResponse(
+                    responseCode = "500",
+                    description = "Internal server error"
+            )
+    })
     @Path("/add")
     @Counted(name = "addProductToCartCount", description = "Count of addProductToCart calls")
     @Timed(name = "addProductToCartTime", description = "Time taken to add a product to a cart")
     @Metered(name = "addProductToCartMetered", description = "Rate of addProductToCart calls")
     @ConcurrentGauge(name = "addProductToCartConcurrent", description = "Concurrent addProductToCart calls")
-    @Timeout(value = 20, unit = ChronoUnit.SECONDS) // Timeout after 20 seconds
+    @Timeout(value = 50, unit = ChronoUnit.SECONDS) // Timeout after 20 seconds
     @Retry(maxRetries = 3) // Retry up to 3 times
     @Fallback(fallbackMethod = "addProductToCartFallback") // Fallback method if all retries fail
-    @CircuitBreaker(requestVolumeThreshold = 4) // Use circuit breaker after 4 failed requests
-    @Bulkhead(5) // Limit concurrent calls to 5
+    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 2000)
+    @Bulkhead(100) // Limit concurrent calls to 5
     @Traced
     public Response addToCart(CartItem cartItem) {
         if (jwt == null) {
-            LOGGER.info("Unauthorized: only authenticated users can add products to his/hers cart.");
-            return Response.status(Response.Status.UNAUTHORIZED).entity("Unauthorized: only authenticated users can add products to his/hers cart.").build();
+            LOGGER.log(Level.SEVERE, "Token verification failed");
+            return Response.status(Response.Status.UNAUTHORIZED)
+                    .entity("Invalid token.")
+                    .build();
         }
         String userId = optSubject.getValue().orElse("default_value");
 
@@ -342,7 +402,7 @@ public class CartResource {
 
             // Fetch the updated item
             GetItemResponse updatedItemResponse = dynamoDB.getItem(getItemRequest);
-
+            LOGGER.log(Level.INFO, "Update quantity and price successful");
             span.setTag("completed", true);
             return Response.ok(ResponseTransformer.transformItem(updatedItemResponse.item())).build();
         } catch (DynamoDbException | MalformedURLException e) {
@@ -357,27 +417,57 @@ public class CartResource {
         LOGGER.info("Fallback activated: Unable to add product to cart at the moment for token: " + optSubject.getValue().orElse("default_value"));
         Map<String, String> response = new HashMap<>();
         response.put("description", "Unable to add product to cart at the moment. Please try again later.");
-        return Response.ok(response).build();
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(response).build();
     }
 
 
-
     @DELETE
+    @Operation(
+            summary = "Delete a product from the user's cart",
+            description = "Removes a specified product from the cart of the authenticated user."
+    )
+    @APIResponses(value = {
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Product successfully deleted from the cart",
+                    content = @Content(
+                            mediaType = "application/json"
+                    )
+            ),
+            @APIResponse(
+                    responseCode = "401",
+                    description = "Unauthorized, invalid token",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = Error.class)
+                    )
+            ),
+            @APIResponse(
+                    responseCode = "500",
+                    description = "Internal server error",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = Error.class)
+                    )
+            )
+    })
     @Path("/{productId}")
     @Counted(name = "deleteProductFromCartCount", description = "Count of deleteProductFromCart calls")
     @Timed(name = "deleteProductFromCartTime", description = "Time taken to delete a product from a cart")
     @Metered(name = "deleteProductFromCartMetered", description = "Rate of deleteProductFromCart calls")
     @ConcurrentGauge(name = "deleteProductFromCartConcurrent", description = "Concurrent deleteProductFromCart calls")
-    @Timeout(value = 20, unit = ChronoUnit.SECONDS) // Timeout after 20 seconds
+    @Timeout(value = 50, unit = ChronoUnit.SECONDS) // Timeout after 50 seconds
     @Retry(maxRetries = 3) // Retry up to 3 times
     @Fallback(fallbackMethod = "deleteProductFromCartFallback") // Fallback method if all retries fail
-    @CircuitBreaker(requestVolumeThreshold = 4) // Use circuit breaker after 4 failed requests
-    @Bulkhead(5) // Limit concurrent calls to 5
+    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 2000)
+    @Bulkhead(100) // Limit concurrent calls to 100
     @Traced
     public Response deleteFromCart(@PathParam("productId") String productId) {
         if (jwt == null) {
-            LOGGER.info("Unauthorized: only authenticated users can delete products from his/hers cart.");
-            return Response.status(Response.Status.UNAUTHORIZED).entity("Unauthorized: only authenticated users can delete products from his/hers cart.").build();
+            LOGGER.log(Level.SEVERE, "Token verification failed");
+            return Response.status(Response.Status.UNAUTHORIZED)
+                    .entity("Invalid token.")
+                    .build();
         }
         String userId = optSubject.getValue().orElse("default_value");
 
@@ -459,30 +549,64 @@ public class CartResource {
                     .attributeUpdates(updatedItemAttrs)
                     .build();
 
-            // Update the item
             dynamoDB.updateItem(updateItemRequest);
-            // Create a response map
+
             Map<String, Object> responseBody = new HashMap<>();
             responseBody.put("TotalPrice", updatedTotalPrice);
             responseBody.put("message", "Product deleted from cart successfully");
+
             span.setTag("completed", true);
+            LOGGER.log(Level.INFO, "Product deleted from cart successfully");
             return Response.ok(responseBody).build();
+
         } catch (DynamoDbException | MalformedURLException e) {
-            LOGGER.log(Level.SEVERE, "Error while deleting product from cart for user " + userId, e);
+            LOGGER.log(Level.SEVERE, "Failed to delete from cart", e);
             span.setTag("error", true);
-            throw new WebApplicationException("Error while deleting product from cart. Please try again later.", e, Response.Status.INTERNAL_SERVER_ERROR);
+            throw new WebApplicationException("Failed to delete from cart", e, Response.Status.INTERNAL_SERVER_ERROR);
         } finally {
             span.finish();
         }
     }
     public Response deleteProductFromCartFallback(@PathParam("productId") String productId) {
-        LOGGER.info("Fallback activated: Unable to delete product from cart at the moment for token: " + optSubject.getValue().orElse("default_value"));
+        LOGGER.info("Fallback activated: Unable to delete product from cart at the moment.");
         Map<String, String> response = new HashMap<>();
-        response.put("description", "Unable to delete product from cart at the moment. Please try again later.");
-        return Response.ok(response).build();
+        response.put("description", "Unable to delete from cart at the moment. Please try again later.");
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                .entity(response)
+                .build();
     }
 
+
     @DELETE
+    @Operation(
+            summary = "Delete the entire cart for the user",
+            description = "Completely deletes the cart of the authenticated user."
+    )
+    @APIResponses(value = {
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Cart successfully deleted",
+                    content = @Content(
+                            mediaType = "application/json"
+                    )
+            ),
+            @APIResponse(
+                    responseCode = "401",
+                    description = "Unauthorized, invalid token",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = Error.class)
+                    )
+            ),
+            @APIResponse(
+                    responseCode = "500",
+                    description = "Internal server error",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = Error.class)
+                    )
+            )
+    })
     @Counted(name = "deleteCartCount", description = "Count of deleteCart calls")
     @Timed(name = "deleteCartTime", description = "Time taken to delete a cart")
     @Metered(name = "deleteCartMetered", description = "Rate of deleteCart calls")
@@ -490,13 +614,15 @@ public class CartResource {
     @Timeout(value = 20, unit = ChronoUnit.SECONDS) // Timeout after 20 seconds
     @Retry(maxRetries = 3) // Retry up to 3 times
     @Fallback(fallbackMethod = "deleteCartFallback") // Fallback method if all retries fail
-    @CircuitBreaker(requestVolumeThreshold = 4) // Use circuit breaker after 4 failed requests
+    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 2000)
     @Bulkhead(5) // Limit concurrent calls to 5
     @Traced
     public Response deleteFromCart() {
         if (jwt == null) {
-            LOGGER.info("Unauthorized: only authenticated users can delete his/hers cart.");
-            return Response.status(Response.Status.UNAUTHORIZED).entity("Unauthorized: only authenticated users can delete his/hers cart.").build();
+            LOGGER.log(Level.SEVERE, "Token verification failed");
+            return Response.status(Response.Status.UNAUTHORIZED)
+                    .entity("Invalid token.")
+                    .build();
         }
         String userId = optSubject.getValue().orElse("default_value");
 
@@ -527,6 +653,7 @@ public class CartResource {
 
             // Create a response map
             Map<String, Object> responseBody = new HashMap<>();
+            LOGGER.log(Level.INFO, "Cart deleted successfully");
             responseBody.put("message", "Cart deleted successfully");
             span.setTag("completed", true);
             return Response.ok(responseBody).build();
@@ -542,6 +669,8 @@ public class CartResource {
         LOGGER.info("Fallback activated: Unable to delete cart at the moment for token: " + optSubject.getValue().orElse("default_value"));
         Map<String, String> response = new HashMap<>();
         response.put("description", "Unable to delete cart at the moment. Please try again later.");
-        return Response.ok(response).build();
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                .entity(response)
+                .build();
     }
 }
