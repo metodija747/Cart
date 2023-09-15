@@ -60,7 +60,7 @@ kumuluzee:
 #    logs:
 #      enabled: true
 #      type: both
-#      level: FINE
+#      level:  FINE
 #      period-s: 60
     checks:
       disk-space-health-check:
