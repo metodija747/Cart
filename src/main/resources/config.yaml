@@ -45,14 +45,14 @@ kumuluzee:
   server:
     http:
       port: 8080
-#  discovery:
-#    etcd:
-#      hosts: http://etcd-client:2379
-#  config:
-#    start-retry-delay-ms: 500
-#    max-retry-delay-ms: 90000
-#    etcd:
-#      hosts: http://etcd-client:2379
+  discovery:
+    etcd:
+      hosts: http://etcd-client:2379
+  config:
+    start-retry-delay-ms: 500
+    max-retry-delay-ms: 90000
+    etcd:
+      hosts: http://etcd-client:2379
   health:
     servlet:
       mapping: /cart/health
