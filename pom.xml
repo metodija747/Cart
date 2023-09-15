@@ -24,10 +24,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.kumuluz.ee</groupId>
-            <artifactId>kumuluzee-microProfile-3.3</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.kumuluz.ee.config</groupId>
             <artifactId>kumuluzee-config-mp</artifactId>
             <version>2.0.0</version>
@@ -91,9 +87,8 @@
             <version>1.4.6</version>
         </dependency>
         <dependency>
-            <groupId>com.kumuluz.ee.metrics</groupId>
-            <artifactId>kumuluzee-metrics-core</artifactId>
-            <version>2.3.0</version>
+            <groupId>com.kumuluz.ee</groupId>
+            <artifactId>kumuluzee-microProfile-3.3</artifactId>
         </dependency>
         <dependency>
             <groupId>com.kumuluz.ee.fault.tolerance</groupId>

@@ -129,7 +129,6 @@ public class CartResource {
     @Counted(name = "getCartCount", description = "Count of getCart calls")
     @Timed(name = "getCartTime", description = "Time taken to fetch a cart")
     @Metered(name = "getCartMetered", description = "Rate of getCart calls")
-    @ConcurrentGauge(name = "getCartConcurrent", description = "Concurrent getCart calls")
     @Timeout(value = 50, unit = ChronoUnit.SECONDS) // Timeout after 50 seconds
     @Retry(maxRetries = 3) // Retry up to 3 times
     @Fallback(fallbackMethod = "getCartFallback") // Fallback method if all retries fail
@@ -240,7 +239,6 @@ public class CartResource {
     @Counted(name = "addProductToCartCount", description = "Count of addProductToCart calls")
     @Timed(name = "addProductToCartTime", description = "Time taken to add a product to a cart")
     @Metered(name = "addProductToCartMetered", description = "Rate of addProductToCart calls")
-    @ConcurrentGauge(name = "addProductToCartConcurrent", description = "Concurrent addProductToCart calls")
     @Timeout(value = 50, unit = ChronoUnit.SECONDS) // Timeout after 20 seconds
     @Retry(maxRetries = 3) // Retry up to 3 times
     @Fallback(fallbackMethod = "addProductToCartFallback") // Fallback method if all retries fail
@@ -455,7 +453,6 @@ public class CartResource {
     @Counted(name = "deleteProductFromCartCount", description = "Count of deleteProductFromCart calls")
     @Timed(name = "deleteProductFromCartTime", description = "Time taken to delete a product from a cart")
     @Metered(name = "deleteProductFromCartMetered", description = "Rate of deleteProductFromCart calls")
-    @ConcurrentGauge(name = "deleteProductFromCartConcurrent", description = "Concurrent deleteProductFromCart calls")
     @Timeout(value = 50, unit = ChronoUnit.SECONDS) // Timeout after 50 seconds
     @Retry(maxRetries = 3) // Retry up to 3 times
     @Fallback(fallbackMethod = "deleteProductFromCartFallback") // Fallback method if all retries fail
@@ -610,7 +607,6 @@ public class CartResource {
     @Counted(name = "deleteCartCount", description = "Count of deleteCart calls")
     @Timed(name = "deleteCartTime", description = "Time taken to delete a cart")
     @Metered(name = "deleteCartMetered", description = "Rate of deleteCart calls")
-    @ConcurrentGauge(name = "deleteCartConcurrent", description = "Concurrent deleteCart calls")
     @Timeout(value = 20, unit = ChronoUnit.SECONDS) // Timeout after 20 seconds
     @Retry(maxRetries = 3) // Retry up to 3 times
     @Fallback(fallbackMethod = "deleteCartFallback") // Fallback method if all retries fail
