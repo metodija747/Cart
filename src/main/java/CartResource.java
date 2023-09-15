@@ -22,8 +22,10 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.ParameterIn;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.ExampleObject;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
+import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
@@ -120,11 +122,16 @@ public class CartResource {
     })
     @Parameter(
             name = "page",
-            description = "The page number for paginated results",
+            description = "The page number for paginated results. Can be any integer.",
+            example = "1",
             required = false,
             in = ParameterIn.QUERY,
-            schema = @Schema(type = SchemaType.INTEGER)
+            schema = @Schema(
+                    type = SchemaType.INTEGER,
+                    minimum = "1"
+            )
     )
+
     @Produces(MediaType.APPLICATION_JSON)
     @Counted(name = "getCartCount", description = "Count of getCart calls")
     @Timed(name = "getCartTime", description = "Time taken to fetch a cart")
@@ -220,6 +227,17 @@ public class CartResource {
     @Operation(
             summary = "Add a product to the user's cart",
             description = "Adds a specified quantity of a product to the cart of the authenticated user."
+    )
+    @RequestBody(
+            description = "Cart item that needs to be added",
+            required = true,
+            content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(
+                            implementation = CartItem.class,
+                            example = "{\"productId\": \"a9abe32e-9bd6-43aa-bc00-9044a27b858b\", \"quantity\": \"1\"}"
+                    )
+            )
     )
     @APIResponses(value = {
             @APIResponse(
@@ -449,6 +467,14 @@ public class CartResource {
                     )
             )
     })
+    @Parameter(
+            name = "productId",
+            in = ParameterIn.PATH,
+            description = "The product ID to be deleted from the cart",
+            required = true,
+            example = "a9abe32e-9bd6-43aa-bc00-9044a27b858b",
+            schema = @Schema(type = SchemaType.STRING)
+    )
     @Path("/{productId}")
     @Counted(name = "deleteProductFromCartCount", description = "Count of deleteProductFromCart calls")
     @Timed(name = "deleteProductFromCartTime", description = "Time taken to delete a product from a cart")
