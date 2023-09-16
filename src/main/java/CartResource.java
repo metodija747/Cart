@@ -147,6 +147,9 @@ public class CartResource {
         if (jwt == null) {
             LOGGER.log(Level.SEVERE, "Token verification failed");
             return Response.status(Response.Status.UNAUTHORIZED)
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                    .header("Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent")
                     .entity("Invalid token.")
                     .build();
         }
@@ -177,16 +180,19 @@ public class CartResource {
             QueryResponse queryResponse = dynamoDB.query(queryRequest);
             List<Map<String, AttributeValue>> itemsList = queryResponse.items();
             if (itemsList.isEmpty() || itemsList.get(0).get("OrderList").s().isEmpty()) {
-                // Create an empty cart response
                 Map<String, Object> emptyCartResponse = new HashMap<>();
                 emptyCartResponse.put("products", Collections.emptyList());
                 emptyCartResponse.put("totalPages", 0);
                 emptyCartResponse.put("totalPrice", 0);
                 LOGGER.info("User's cart is empty");
                 return Response.status(Response.Status.OK)
+                        .header("Access-Control-Allow-Origin", "*")
+                        .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                        .header("Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent")
                         .entity(emptyCartResponse)
                         .build();
             }
+
             Map<String, AttributeValue> userCart = itemsList.get(0);
             List<Map<String, String>> items = ResponseTransformer.transformCartItems(Collections.singletonList(userCart));
             List<Map<String, String>> products = new Gson().fromJson(items.get(0).get("products"), new TypeToken<List<Map<String, String>>>() {
@@ -205,8 +211,12 @@ public class CartResource {
             responseBody.put("totalPages", totalPages);
             responseBody.put("totalPrice", items.get(0).get("TotalPrice"));
             LOGGER.info("Successfully obtained user's cart");
-            return Response.status(Response.Status.OK).entity(responseBody).build();
-
+            return Response.status(Response.Status.OK)
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                    .header("Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent")
+                    .entity(responseBody)
+                    .build();
         } catch (DynamoDbException e) {
             LOGGER.log(Level.SEVERE, "Error while getting cart for user " + userId, e);
             span.setTag("error", true);
@@ -219,8 +229,12 @@ public class CartResource {
         LOGGER.info("Fallback activated: Unable to fetch cart at the moment for token: " + optSubject.getValue().orElse("default_value"));
         Map<String, String> response = new HashMap<>();
         response.put("description", "Unable to fetch cart at the moment. Please try again later.");
-        return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(response).build();
-    }
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                .header("Access-Control-Allow-Origin", "*")
+                .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                .header("Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent")
+                .entity(response)
+                .build();    }
 
 
     @POST
@@ -267,6 +281,9 @@ public class CartResource {
         if (jwt == null) {
             LOGGER.log(Level.SEVERE, "Token verification failed");
             return Response.status(Response.Status.UNAUTHORIZED)
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                    .header("Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent")
                     .entity("Invalid token.")
                     .build();
         }
@@ -420,7 +437,11 @@ public class CartResource {
             GetItemResponse updatedItemResponse = dynamoDB.getItem(getItemRequest);
             LOGGER.log(Level.INFO, "Update quantity and price successful");
             span.setTag("completed", true);
-            return Response.ok(ResponseTransformer.transformItem(updatedItemResponse.item())).build();
+            return Response.ok(ResponseTransformer.transformItem(updatedItemResponse.item()))
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                    .header("Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent")
+                    .build();
         } catch (DynamoDbException | MalformedURLException e) {
             LOGGER.log(Level.SEVERE, "Error while adding product to cart for user " + userId, e);
             span.setTag("error", true);
@@ -433,8 +454,12 @@ public class CartResource {
         LOGGER.info("Fallback activated: Unable to add product to cart at the moment for token: " + optSubject.getValue().orElse("default_value"));
         Map<String, String> response = new HashMap<>();
         response.put("description", "Unable to add product to cart at the moment. Please try again later.");
-        return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(response).build();
-    }
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                .header("Access-Control-Allow-Origin", "*")
+                .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                .header("Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent")
+                .entity(response)
+                .build();    }
 
 
     @DELETE
@@ -489,6 +514,9 @@ public class CartResource {
         if (jwt == null) {
             LOGGER.log(Level.SEVERE, "Token verification failed");
             return Response.status(Response.Status.UNAUTHORIZED)
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                    .header("Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent")
                     .entity("Invalid token.")
                     .build();
         }
@@ -580,8 +608,11 @@ public class CartResource {
 
             span.setTag("completed", true);
             LOGGER.log(Level.INFO, "Product deleted from cart successfully");
-            return Response.ok(responseBody).build();
-
+            return Response.ok(responseBody)
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                    .header("Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent")
+                    .build();
         } catch (DynamoDbException | MalformedURLException e) {
             LOGGER.log(Level.SEVERE, "Failed to delete from cart", e);
             span.setTag("error", true);
@@ -595,6 +626,9 @@ public class CartResource {
         Map<String, String> response = new HashMap<>();
         response.put("description", "Unable to delete from cart at the moment. Please try again later.");
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                .header("Access-Control-Allow-Origin", "*")
+                .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                .header("Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent")
                 .entity(response)
                 .build();
     }
@@ -643,6 +677,9 @@ public class CartResource {
         if (jwt == null) {
             LOGGER.log(Level.SEVERE, "Token verification failed");
             return Response.status(Response.Status.UNAUTHORIZED)
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                    .header("Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent")
                     .entity("Invalid token.")
                     .build();
         }
@@ -678,7 +715,11 @@ public class CartResource {
             LOGGER.log(Level.INFO, "Cart deleted successfully");
             responseBody.put("message", "Cart deleted successfully");
             span.setTag("completed", true);
-            return Response.ok(responseBody).build();
+            return Response.ok(responseBody)
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                    .header("Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent")
+                    .build();
         } catch (DynamoDbException e) {
             LOGGER.log(Level.SEVERE, "Error while deleting cart for user " + userId, e);
             span.setTag("error", true);
@@ -692,6 +733,9 @@ public class CartResource {
         Map<String, String> response = new HashMap<>();
         response.put("description", "Unable to delete cart at the moment. Please try again later.");
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                .header("Access-Control-Allow-Origin", "*")
+                .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                .header("Access-Control-Allow-Headers", "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent")
                 .entity(response)
                 .build();
     }
