@@ -249,7 +249,7 @@ public class CartResource {
                     mediaType = "application/json",
                     schema = @Schema(
                             implementation = CartItem.class,
-                            example = "{\"productId\": \"a9abe32e-9bd6-43aa-bc00-9044a27b858b\", \"quantity\": \"1\"}"
+                            example = "{\"productId\": \"33c08f3a-f764-493d-988a-6ceb4a78d25d\", \"quantity\": \"1\"}"
                     )
             )
     )
@@ -497,7 +497,7 @@ public class CartResource {
             in = ParameterIn.PATH,
             description = "The product ID to be deleted from the cart",
             required = true,
-            example = "a9abe32e-9bd6-43aa-bc00-9044a27b858b",
+            example = "33c08f3a-f764-493d-988a-6ceb4a78d25d",
             schema = @Schema(type = SchemaType.STRING)
     )
     @Path("/{productId}")
