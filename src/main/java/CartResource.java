@@ -408,7 +408,7 @@ public class CartResource {
                     Product product = gson.fromJson(json, Product.class);
 
                     // Get the price of the product
-                    double productPrice = product.getPrice();
+                    double productPrice = product.getDiscountPrice();
 
                     // Add the total price of this product to the total price
                     totalPrice += productPrice * quantityOrder;
@@ -579,7 +579,7 @@ public class CartResource {
             Product product = gson.fromJson(json, Product.class);
 
             // Get the price of the product
-            double productPrice = product.getPrice();
+            double productPrice = product.getDiscountPrice();
 
             // Add the total price of this product to the total price
             double updatedTotalPrice = totalPrice - productPrice * quantityToDelete;
